@@ -1,0 +1,894 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bottle Idle</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Fredoka', sans-serif; }
+   
+    @keyframes droplet {
+      0% { transform: translateY(-10px) scale(0); opacity: 0; }
+      50% { opacity: 1; }
+      100% { transform: translateY(30px) scale(1); opacity: 0; }
+    }
+   
+    @keyframes bobble {
+      0%, 100% { transform: translateY(0) rotate(-2deg); }
+      50% { transform: translateY(-8px) rotate(2deg); }
+    }
+   
+    @keyframes fill-wave {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+   
+    @keyframes sparkle {
+      0%, 100% { opacity: 0; transform: scale(0); }
+      50% { opacity: 1; transform: scale(1); }
+    }
+   
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 20px rgba(56, 189, 248, 0.3); }
+      50% { box-shadow: 0 0 40px rgba(56, 189, 248, 0.6); }
+    }
+   
+    .bottle-btn {
+      animation: bobble 3s ease-in-out infinite;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+   
+    .bottle-btn:hover {
+      animation-play-state: paused;
+      transform: scale(1.05);
+    }
+   
+    .bottle-btn:active {
+      transform: scale(0.95);
+    }
+   
+    .droplet {
+      animation: droplet 0.6s ease-out forwards;
+    }
+   
+    .upgrade-card {
+      transition: all 0.3s ease;
+    }
+   
+    .upgrade-card:hover:not(:disabled) {
+      transform: translateY(-4px);
+    }
+   
+    .upgrade-card:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+   
+    .water-fill {
+      position: relative;
+      overflow: hidden;
+    }
+   
+    .water-fill::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      animation: fill-wave 2s ease-in-out infinite;
+    }
+   
+    .sparkle {
+      animation: sparkle 1.5s ease-in-out infinite;
+    }
+   
+    .main-container {
+      animation: pulse-glow 4s ease-in-out infinite;
+    }
+
+    .achievement-tooltip {
+      position: relative;
+      cursor: pointer;
+    }
+
+    .tooltip-text {
+      visibility: hidden;
+      width: 200px;
+      background-color: rgba(0,0,0,0.8);
+      color: #fff;
+      text-align: center;
+      padding: 8px;
+      border-radius: 6px;
+      position: absolute;
+      z-index: 10;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -100px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 12px;
+      white-space: normal;
+    }
+
+    .achievement-tooltip:hover .tooltip-text {
+      visibility: visible;
+      opacity: 1;
+    }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+ </head>
+ <body class="h-full bg-gradient-to-br from-cyan-900 via-blue-900 to-indigo-900 overflow-auto">
+  <div class="h-full w-full p-4 md:p-6">
+   <div class="max-w-6xl mx-auto"><!-- Header -->
+    <div class="text-center mb-6">
+     <h1 id="game-title" class="text-4xl md:text-5xl font-bold text-white drop-shadow-lg">💧 Bottle Idle 💧</h1>
+     <p class="text-cyan-200 mt-2 text-lg">Click to fill bottles with refreshing water!</p>
+    </div><!-- Stats Bar -->
+    <div class="main-container bg-white/10 backdrop-blur-md rounded-2xl p-4 mb-6 border border-cyan-400/30">
+     <div class="flex flex-wrap justify-center gap-6 text-white">
+      <div class="text-center">
+       <div class="text-3xl md:text-4xl font-bold text-cyan-300" id="water-count">
+        0
+       </div>
+       <div class="text-sm text-cyan-100">
+        💧 Water
+       </div>
+      </div>
+      <div class="text-center">
+       <div class="text-2xl md:text-3xl font-bold text-blue-300" id="per-click">
+        1
+       </div>
+       <div class="text-sm text-blue-100">
+        Per Click
+       </div>
+      </div>
+      <div class="text-center">
+       <div class="text-2xl md:text-3xl font-bold text-indigo-300" id="per-second">
+        0
+       </div>
+       <div class="text-sm text-indigo-100">
+        Per Second
+       </div>
+      </div>
+     </div>
+    </div><!-- Main Bottle Click Area -->
+    <div class="flex justify-center mb-8 relative" id="click-area"><button id="main-bottle" class="bottle-btn relative focus:outline-none" aria-label="Click to collect water">
+      <svg width="180" height="240" viewbox="0 0 180 240" class="drop-shadow-2xl"><!-- Bottle cap --> <rect x="65" y="5" width="50" height="25" rx="5" fill="#0ea5e9" stroke="#0284c7" stroke-width="2" /> <rect x="60" y="25" width="60" height="10" rx="3" fill="#0284c7" /> <!-- Bottle neck --> <path d="M70 35 L70 55 Q70 65 60 75 L60 75" fill="none" stroke="#e0f2fe" stroke-width="2" /> <path d="M110 35 L110 55 Q110 65 120 75 L120 75" fill="none" stroke="#e0f2fe" stroke-width="2" /> <rect x="70" y="35" width="40" height="30" fill="#e0f2fe" opacity="0.9" /> <!-- Bottle body --> <path d="M60 65 Q40 80 35 100 L35 200 Q35 225 60 230 L120 230 Q145 225 145 200 L145 100 Q140 80 120 65 Z" fill="#e0f2fe" opacity="0.9" stroke="#bae6fd" stroke-width="2" /> <!-- Bottle ridges --> <g stroke="#7dd3fc" stroke-width="1.5" opacity="0.6" fill="none">
+        <path d="M 50 90 Q 50 110 52 130" />
+        <path d="M 130 90 Q 130 110 128 130" />
+        <path d="M 48 95 Q 48 115 50 135" />
+        <path d="M 132 95 Q 132 115 130 135" />
+        <path d="M 46 100 Q 46 120 48 140" />
+        <path d="M 134 100 Q 134 120 132 140" />
+        <path d="M 45 110 Q 45 130 47 150" />
+        <path d="M 135 110 Q 135 130 133 150" />
+        <path d="M 45 125 Q 45 145 47 165" />
+        <path d="M 135 125 Q 135 145 133 165" />
+        <path d="M 46 140 Q 46 160 48 180" />
+        <path d="M 134 140 Q 134 160 132 180" />
+       </g> <!-- Water fill --> <clippath id="bottle-clip">
+        <path d="M60 65 Q40 80 35 100 L35 200 Q35 225 60 230 L120 230 Q145 225 145 200 L145 100 Q140 80 120 65 Z" />
+       </clippath> <g clip-path="url(#bottle-clip)">
+        <rect id="water-level" x="30" y="230" width="120" height="0" class="water-fill" fill="url(#water-gradient)">
+         <animate attributename="y" dur="0.3s" fill="freeze" />
+        </rect>
+       </g> <!-- Water gradient --> <defs>
+        <lineargradient id="water-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+         <stop offset="0%" style="stop-color:#22d3ee" />
+         <stop offset="50%" style="stop-color:#0ea5e9" />
+         <stop offset="100%" style="stop-color:#0284c7" />
+        </lineargradient>
+       </defs> <!-- Shine effect --> <ellipse cx="55" cy="140" rx="8" ry="40" fill="white" opacity="0.3" /> <ellipse cx="50" cy="100" rx="5" ry="15" fill="white" opacity="0.4" />
+      </svg><!-- Sparkles -->
+      <div class="absolute top-10 left-2 text-2xl sparkle" style="animation-delay: 0s;">
+       ✨
+      </div>
+      <div class="absolute top-20 right-0 text-xl sparkle" style="animation-delay: 0.5s;">
+       ✨
+      </div>
+      <div class="absolute bottom-20 left-0 text-lg sparkle" style="animation-delay: 1s;">
+       ✨
+      </div></button>
+    </div><!-- Click Upgrades Section -->
+    <div class="mb-6">
+     <h2 class="text-white font-bold text-xl mb-3">⚡ Click Upgrades</h2>
+     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3"><button id="click-up-1" class="upgrade-card bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-3 text-white text-left border-2 border-cyan-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        👆
+       </div>
+       <div class="font-bold text-xs">
+        Click Boost
+       </div>
+       <div class="text-cyan-100 text-xs mb-1">
+        +1 per click
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-cyan-700/50 px-2 py-1 rounded">Lv. <span class="click-1-owned">0</span></span> <span class="font-bold text-xs click-1-cost">💧 5</span>
+       </div></button> <button id="click-up-2" class="upgrade-card bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-3 text-white text-left border-2 border-cyan-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        ✌️
+       </div>
+       <div class="font-bold text-xs">
+        Double Tap
+       </div>
+       <div class="text-cyan-100 text-xs mb-1">
+        +2 per click
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-cyan-700/50 px-2 py-1 rounded">Lv. <span class="click-2-owned">0</span></span> <span class="font-bold text-xs click-2-cost">💧 20</span>
+       </div></button> <button id="click-up-3" class="upgrade-card bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-3 text-white text-left border-2 border-cyan-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        👐
+       </div>
+       <div class="font-bold text-xs">
+        Both Hands
+       </div>
+       <div class="text-cyan-100 text-xs mb-1">
+        +3 per click
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-cyan-700/50 px-2 py-1 rounded">Lv. <span class="click-3-owned">0</span></span> <span class="font-bold text-xs click-3-cost">💧 50</span>
+       </div></button> <button id="click-up-4" class="upgrade-card bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-3 text-white text-left border-2 border-cyan-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        🦾
+       </div>
+       <div class="font-bold text-xs">
+        Arm Power
+       </div>
+       <div class="text-cyan-100 text-xs mb-1">
+        +5 per click
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-cyan-700/50 px-2 py-1 rounded">Lv. <span class="click-4-owned">0</span></span> <span class="font-bold text-xs click-4-cost">💧 150</span>
+       </div></button> <button id="click-up-5" class="upgrade-card bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-3 text-white text-left border-2 border-cyan-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        💪
+       </div>
+       <div class="font-bold text-xs">
+        Super Strength
+       </div>
+       <div class="text-cyan-100 text-xs mb-1">
+        +10 per click
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-cyan-700/50 px-2 py-1 rounded">Lv. <span class="click-5-owned">0</span></span> <span class="font-bold text-xs click-5-cost">💧 500</span>
+       </div></button> <button id="click-up-6" class="upgrade-card bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-3 text-white text-left border-2 border-cyan-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        ⚡
+       </div>
+       <div class="font-bold text-xs">
+        Lightning Click
+       </div>
+       <div class="text-cyan-100 text-xs mb-1">
+        +15 per click
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-cyan-700/50 px-2 py-1 rounded">Lv. <span class="click-6-owned">0</span></span> <span class="font-bold text-xs click-6-cost">💧 1.5K</span>
+       </div></button> <button id="click-up-7" class="upgrade-card bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-3 text-white text-left border-2 border-cyan-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        🔥
+       </div>
+       <div class="font-bold text-xs">
+        Fire Punch
+       </div>
+       <div class="text-cyan-100 text-xs mb-1">
+        +25 per click
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-cyan-700/50 px-2 py-1 rounded">Lv. <span class="click-7-owned">0</span></span> <span class="font-bold text-xs click-7-cost">💧 5K</span>
+       </div></button> <button id="click-up-8" class="upgrade-card bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-3 text-white text-left border-2 border-cyan-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        💥
+       </div>
+       <div class="font-bold text-xs">
+        Explosion
+       </div>
+       <div class="text-cyan-100 text-xs mb-1">
+        +50 per click
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-cyan-700/50 px-2 py-1 rounded">Lv. <span class="click-8-owned">0</span></span> <span class="font-bold text-xs click-8-cost">💧 15K</span>
+       </div></button> <button id="click-up-9" class="upgrade-card bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-3 text-white text-left border-2 border-cyan-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        ✨
+       </div>
+       <div class="font-bold text-xs">
+        Magic Tap
+       </div>
+       <div class="text-cyan-100 text-xs mb-1">
+        +100 per click
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-cyan-700/50 px-2 py-1 rounded">Lv. <span class="click-9-owned">0</span></span> <span class="font-bold text-xs click-9-cost">💧 50K</span>
+       </div></button> <button id="click-up-10" class="upgrade-card bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-3 text-white text-left border-2 border-cyan-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        🌟
+       </div>
+       <div class="font-bold text-xs">
+        Godly Touch
+       </div>
+       <div class="text-cyan-100 text-xs mb-1">
+        +500 per click
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-cyan-700/50 px-2 py-1 rounded">Lv. <span class="click-10-owned">0</span></span> <span class="font-bold text-xs click-10-cost">💧 250K</span>
+       </div></button>
+     </div>
+    </div><!-- Speed Upgrades Section -->
+    <div class="mb-6">
+     <h2 class="text-white font-bold text-xl mb-3">⏱️ Speed Upgrades</h2>
+     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3"><button id="speed-up-1" class="upgrade-card bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 text-white text-left border-2 border-blue-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        💧
+       </div>
+       <div class="font-bold text-xs">
+        Drip
+       </div>
+       <div class="text-blue-100 text-xs mb-1">
+        +1 per second
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-blue-700/50 px-2 py-1 rounded">Lv. <span class="speed-1-owned">0</span></span> <span class="font-bold text-xs speed-1-cost">💧 25</span>
+       </div></button> <button id="speed-up-2" class="upgrade-card bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 text-white text-left border-2 border-blue-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        💦
+       </div>
+       <div class="font-bold text-xs">
+        Flow
+       </div>
+       <div class="text-blue-100 text-xs mb-1">
+        +3 per second
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-blue-700/50 px-2 py-1 rounded">Lv. <span class="speed-2-owned">0</span></span> <span class="font-bold text-xs speed-2-cost">💧 100</span>
+       </div></button> <button id="speed-up-3" class="upgrade-card bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 text-white text-left border-2 border-blue-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        🌊
+       </div>
+       <div class="font-bold text-xs">
+        Wave
+       </div>
+       <div class="text-blue-100 text-xs mb-1">
+        +10 per second
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-blue-700/50 px-2 py-1 rounded">Lv. <span class="speed-3-owned">0</span></span> <span class="font-bold text-xs speed-3-cost">💧 400</span>
+       </div></button> <button id="speed-up-4" class="upgrade-card bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 text-white text-left border-2 border-blue-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        🌀
+       </div>
+       <div class="font-bold text-xs">
+        Tornado
+       </div>
+       <div class="text-blue-100 text-xs mb-1">
+        +25 per second
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-blue-700/50 px-2 py-1 rounded">Lv. <span class="speed-4-owned">0</span></span> <span class="font-bold text-xs speed-4-cost">💧 1K</span>
+       </div></button> <button id="speed-up-5" class="upgrade-card bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 text-white text-left border-2 border-blue-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        ❄️
+       </div>
+       <div class="font-bold text-xs">
+        Cascade
+       </div>
+       <div class="text-blue-100 text-xs mb-1">
+        +50 per second
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-blue-700/50 px-2 py-1 rounded">Lv. <span class="speed-5-owned">0</span></span> <span class="font-bold text-xs speed-5-cost">💧 3K</span>
+       </div></button> <button id="speed-up-6" class="upgrade-card bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 text-white text-left border-2 border-blue-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        💎
+       </div>
+       <div class="font-bold text-xs">
+        Glacier
+       </div>
+       <div class="text-blue-100 text-xs mb-1">
+        +100 per second
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-blue-700/50 px-2 py-1 rounded">Lv. <span class="speed-6-owned">0</span></span> <span class="font-bold text-xs speed-6-cost">💧 10K</span>
+       </div></button> <button id="speed-up-7" class="upgrade-card bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 text-white text-left border-2 border-blue-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        🚀
+       </div>
+       <div class="font-bold text-xs">
+        Jet Stream
+       </div>
+       <div class="text-blue-100 text-xs mb-1">
+        +250 per second
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-blue-700/50 px-2 py-1 rounded">Lv. <span class="speed-7-owned">0</span></span> <span class="font-bold text-xs speed-7-cost">💧 40K</span>
+       </div></button> <button id="speed-up-8" class="upgrade-card bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 text-white text-left border-2 border-blue-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        🌪️
+       </div>
+       <div class="font-bold text-xs">
+        Maelstrom
+       </div>
+       <div class="text-blue-100 text-xs mb-1">
+        +500 per second
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-blue-700/50 px-2 py-1 rounded">Lv. <span class="speed-8-owned">0</span></span> <span class="font-bold text-xs speed-8-cost">💧 150K</span>
+       </div></button> <button id="speed-up-9" class="upgrade-card bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 text-white text-left border-2 border-blue-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        ⚡
+       </div>
+       <div class="font-bold text-xs">
+        Tempest
+       </div>
+       <div class="text-blue-100 text-xs mb-1">
+        +1K per second
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-blue-700/50 px-2 py-1 rounded">Lv. <span class="speed-9-owned">0</span></span> <span class="font-bold text-xs speed-9-cost">💧 500K</span>
+       </div></button> <button id="speed-up-10" class="upgrade-card bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 text-white text-left border-2 border-blue-400 hover:border-white">
+       <div class="text-2xl mb-1">
+        🌈
+       </div>
+       <div class="font-bold text-xs">
+        Eternal Flow
+       </div>
+       <div class="text-blue-100 text-xs mb-1">
+        +5K per second
+       </div>
+       <div class="flex justify-between items-center gap-1"><span class="text-xs bg-blue-700/50 px-2 py-1 rounded">Lv. <span class="speed-10-owned">0</span></span> <span class="font-bold text-xs speed-10-cost">💧 2.5M</span>
+       </div></button>
+     </div>
+    </div><!-- Achievements -->
+    <div class="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20">
+     <h2 class="text-white font-bold text-xl mb-3">🏆 Achievements (20)</h2>
+     <div class="flex flex-wrap gap-2" id="achievements"><!-- Water Achievements -->
+      <div id="ach-100" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        💧 100 Water
+       </div>
+       <div class="tooltip-text">
+        Collect 100 water total
+       </div>
+      </div>
+      <div id="ach-1000" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        💧 1K Water
+       </div>
+       <div class="tooltip-text">
+        Collect 1,000 water total
+       </div>
+      </div>
+      <div id="ach-10000" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        💧 10K Water
+       </div>
+       <div class="tooltip-text">
+        Collect 10,000 water total
+       </div>
+      </div>
+      <div id="ach-100k" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        💧 100K Water
+       </div>
+       <div class="tooltip-text">
+        Collect 100,000 water total
+       </div>
+      </div>
+      <div id="ach-1m" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        💧 1M Water
+       </div>
+       <div class="tooltip-text">
+        Collect 1,000,000 water total
+       </div>
+      </div><!-- Click Achievements -->
+      <div id="ach-click-100" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        👆 100 Clicks
+       </div>
+       <div class="tooltip-text">
+        Click the bottle 100 times
+       </div>
+      </div>
+      <div id="ach-click-1000" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        👆 1K Clicks
+       </div>
+       <div class="tooltip-text">
+        Click the bottle 1,000 times
+       </div>
+      </div>
+      <div id="ach-click-10000" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        👆 10K Clicks
+       </div>
+       <div class="tooltip-text">
+        Click the bottle 10,000 times
+       </div>
+      </div><!-- Speed Achievements -->
+      <div id="ach-10ps" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        ⏱️ 10/sec
+       </div>
+       <div class="tooltip-text">
+        Generate 10 water per second
+       </div>
+      </div>
+      <div id="ach-100ps" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        ⏱️ 100/sec
+       </div>
+       <div class="tooltip-text">
+        Generate 100 water per second
+       </div>
+      </div>
+      <div id="ach-1000ps" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        ⏱️ 1K/sec
+       </div>
+       <div class="tooltip-text">
+        Generate 1,000 water per second
+       </div>
+      </div><!-- Per Click Achievements -->
+      <div id="ach-5click" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        💥 5 per click
+       </div>
+       <div class="tooltip-text">
+        Upgrade to 5 water per click
+       </div>
+      </div>
+      <div id="ach-50click" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        💥 50 per click
+       </div>
+       <div class="tooltip-text">
+        Upgrade to 50 water per click
+       </div>
+      </div>
+      <div id="ach-500click" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        💥 500 per click
+       </div>
+       <div class="tooltip-text">
+        Upgrade to 500 water per click
+       </div>
+      </div><!-- Upgrade Achievements -->
+      <div id="ach-5upgrades" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        🎁 5 Upgrades
+       </div>
+       <div class="tooltip-text">
+        Buy 5 total upgrades
+       </div>
+      </div>
+      <div id="ach-50upgrades" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        🎁 50 Upgrades
+       </div>
+       <div class="tooltip-text">
+        Buy 50 total upgrades
+       </div>
+      </div>
+      <div id="ach-200upgrades" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        🎁 200 Upgrades
+       </div>
+       <div class="tooltip-text">
+        Buy 200 total upgrades
+       </div>
+      </div><!-- Special Achievements -->
+      <div id="ach-maxclick" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        🌟 Max Click
+       </div>
+       <div class="tooltip-text">
+        Buy all 10 click upgrades
+       </div>
+      </div>
+      <div id="ach-maxspeed" class="achievement-tooltip">
+       <div class="achievement bg-gray-700/50 text-gray-400 px-3 py-2 rounded-lg text-sm transition-all">
+        🌟 Max Speed
+       </div>
+       <div class="tooltip-text">
+        Buy all 10 speed upgrades
+       </div>
+      </div>
+     </div>
+    </div><!-- Save indicator -->
+    <div class="text-center mt-4"><span id="save-indicator" class="text-cyan-300/60 text-sm">Auto-saving to your Canva Sheet...</span>
+    </div>
+   </div>
+  </div>
+  <script>
+    const defaultConfig = {
+      game_title: '💧 Bottle Idle 💧',
+      background_color: '#164e63',
+      surface_color: '#0e7490',
+      text_color: '#ffffff',
+      primary_action_color: '#06b6d4',
+      secondary_action_color: '#22d3ee'
+    };
+
+    let gameState = {
+      water: 0,
+      click_levels: [0,0,0,0,0,0,0,0,0,0],
+      speed_levels: [0,0,0,0,0,0,0,0,0,0],
+      water_per_click: 1,
+      total_clicks: 0,
+      max_water_ever: 0,
+      total_upgrades: 0
+    };
+
+    const clickUpgrades = [
+      { cost: 5, bonus: 1 },
+      { cost: 20, bonus: 2 },
+      { cost: 50, bonus: 3 },
+      { cost: 150, bonus: 5 },
+      { cost: 500, bonus: 10 },
+      { cost: 1500, bonus: 15 },
+      { cost: 5000, bonus: 25 },
+      { cost: 15000, bonus: 50 },
+      { cost: 50000, bonus: 100 },
+      { cost: 250000, bonus: 500 }
+    ];
+
+    const speedUpgrades = [
+      { cost: 25, bonus: 1 },
+      { cost: 100, bonus: 3 },
+      { cost: 400, bonus: 10 },
+      { cost: 1000, bonus: 25 },
+      { cost: 3000, bonus: 50 },
+      { cost: 10000, bonus: 100 },
+      { cost: 40000, bonus: 250 },
+      { cost: 150000, bonus: 500 },
+      { cost: 500000, bonus: 1000 },
+      { cost: 2500000, bonus: 5000 }
+    ];
+
+    function formatNumber(num) {
+      if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+      if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+      return Math.floor(num).toString();
+    }
+
+    function getWaterPerSecond() {
+      return speedUpgrades.reduce((sum, up, i) => sum + (up.bonus * gameState.speed_levels[i]), 0);
+    }
+
+    function updateUI() {
+      document.getElementById('water-count').textContent = formatNumber(gameState.water);
+      document.getElementById('per-click').textContent = gameState.water_per_click;
+      document.getElementById('per-second').textContent = formatNumber(getWaterPerSecond());
+
+      for (let i = 0; i < 10; i++) {
+        document.querySelectorAll(`.click-${i+1}-owned`).forEach(el => el.textContent = gameState.click_levels[i]);
+        document.querySelectorAll(`.speed-${i+1}-owned`).forEach(el => el.textContent = gameState.speed_levels[i]);
+      }
+
+      for (let i = 0; i < 10; i++) {
+        const clickCost = clickUpgrades[i].cost * Math.pow(1.15, gameState.click_levels[i]);
+        const speedCost = speedUpgrades[i].cost * Math.pow(1.15, gameState.speed_levels[i]);
+        document.querySelectorAll(`.click-${i+1}-cost`).forEach(el => el.textContent = '💧 ' + formatNumber(clickCost));
+        document.querySelectorAll(`.speed-${i+1}-cost`).forEach(el => el.textContent = '💧 ' + formatNumber(speedCost));
+
+        document.getElementById(`click-up-${i+1}`).disabled = gameState.water < clickCost;
+        document.getElementById(`speed-up-${i+1}`).disabled = gameState.water < speedCost;
+      }
+
+      const fillPercent = Math.min(gameState.water / 1000, 1);
+      const waterLevel = document.getElementById('water-level');
+      waterLevel.setAttribute('y', 230 - (fillPercent * 165));
+      waterLevel.setAttribute('height', fillPercent * 165);
+
+      checkAchievements();
+    }
+
+    function checkAchievements() {
+      gameState.max_water_ever = Math.max(gameState.max_water_ever, gameState.water);
+     
+      if (gameState.max_water_ever >= 100) unlockAchievement('ach-100');
+      if (gameState.max_water_ever >= 1000) unlockAchievement('ach-1000');
+      if (gameState.max_water_ever >= 10000) unlockAchievement('ach-10000');
+      if (gameState.max_water_ever >= 100000) unlockAchievement('ach-100k');
+      if (gameState.max_water_ever >= 1000000) unlockAchievement('ach-1m');
+     
+      if (gameState.total_clicks >= 100) unlockAchievement('ach-click-100');
+      if (gameState.total_clicks >= 1000) unlockAchievement('ach-click-1000');
+      if (gameState.total_clicks >= 10000) unlockAchievement('ach-click-10000');
+     
+      const wps = getWaterPerSecond();
+      if (wps >= 10) unlockAchievement('ach-10ps');
+      if (wps >= 100) unlockAchievement('ach-100ps');
+      if (wps >= 1000) unlockAchievement('ach-1000ps');
+     
+      if (gameState.water_per_click >= 5) unlockAchievement('ach-5click');
+      if (gameState.water_per_click >= 50) unlockAchievement('ach-50click');
+      if (gameState.water_per_click >= 500) unlockAchievement('ach-500click');
+     
+      if (gameState.total_upgrades >= 5) unlockAchievement('ach-5upgrades');
+      if (gameState.total_upgrades >= 50) unlockAchievement('ach-50upgrades');
+      if (gameState.total_upgrades >= 200) unlockAchievement('ach-200upgrades');
+     
+      if (gameState.click_levels.every(l => l > 0)) unlockAchievement('ach-maxclick');
+      if (gameState.speed_levels.every(l => l > 0)) unlockAchievement('ach-maxspeed');
+    }
+
+    function unlockAchievement(id) {
+      const el = document.getElementById(id);
+      if (!el.querySelector('.achievement').classList.contains('unlocked')) {
+        el.querySelector('.achievement').classList.remove('bg-gray-700/50', 'text-gray-400');
+        el.querySelector('.achievement').classList.add('bg-gradient-to-r', 'from-yellow-500', 'to-amber-500', 'text-white', 'unlocked');
+      }
+    }
+
+    function createDroplet(x, y) {
+      const clickArea = document.getElementById('click-area');
+      const droplet = document.createElement('div');
+      droplet.className = 'droplet absolute text-2xl pointer-events-none';
+      droplet.textContent = '+' + gameState.water_per_click;
+      droplet.style.left = x + 'px';
+      droplet.style.top = y + 'px';
+      droplet.style.color = '#22d3ee';
+      droplet.style.fontWeight = 'bold';
+      droplet.style.textShadow = '0 0 10px rgba(34, 211, 238, 0.8)';
+      clickArea.appendChild(droplet);
+      setTimeout(() => droplet.remove(), 600);
+    }
+
+    document.getElementById('main-bottle').addEventListener('click', function(e) {
+      gameState.water += gameState.water_per_click;
+      gameState.total_clicks++;
+     
+      const rect = this.getBoundingClientRect();
+      const clickArea = document.getElementById('click-area');
+      const areaRect = clickArea.getBoundingClientRect();
+      createDroplet(e.clientX - areaRect.left - 20, e.clientY - areaRect.top - 20);
+     
+      updateUI();
+      scheduleSave();
+    });
+
+    for (let i = 0; i < 10; i++) {
+      document.getElementById(`click-up-${i+1}`).addEventListener('click', function() {
+        const cost = clickUpgrades[i].cost * Math.pow(1.15, gameState.click_levels[i]);
+        if (gameState.water >= cost) {
+          gameState.water -= cost;
+          gameState.click_levels[i]++;
+          gameState.water_per_click += clickUpgrades[i].bonus;
+          gameState.total_upgrades++;
+          updateUI();
+          scheduleSave();
+        }
+      });
+
+      document.getElementById(`speed-up-${i+1}`).addEventListener('click', function() {
+        const cost = speedUpgrades[i].cost * Math.pow(1.15, gameState.speed_levels[i]);
+        if (gameState.water >= cost) {
+          gameState.water -= cost;
+          gameState.speed_levels[i]++;
+          gameState.total_upgrades++;
+          updateUI();
+          scheduleSave();
+        }
+      });
+    }
+
+    setInterval(function() {
+      const wps = getWaterPerSecond();
+      if (wps > 0) {
+        gameState.water += wps / 10;
+        updateUI();
+      }
+    }, 100);
+
+    let currentRecord = null;
+    let saveTimeout = null;
+
+    function scheduleSave() {
+      if (saveTimeout) clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(saveGame, 2000);
+    }
+
+    async function saveGame() {
+      if (!window.dataSdk) return;
+     
+      const saveData = {
+        water: Math.floor(gameState.water),
+        bottles: 0,
+        auto_fillers: 0,
+        purifiers: 0,
+        factories: 0,
+        click_upgrades: JSON.stringify(gameState.click_levels),
+        speed_upgrades: JSON.stringify(gameState.speed_levels),
+        water_per_click: gameState.water_per_click,
+        last_save: Date.now(),
+        total_clicks: gameState.total_clicks,
+        max_water_ever: gameState.max_water_ever
+      };
+     
+      document.getElementById('save-indicator').textContent = 'Saving...';
+     
+      let result;
+      if (currentRecord) {
+        result = await window.dataSdk.update({ ...currentRecord, ...saveData });
+      } else {
+        result = await window.dataSdk.create(saveData);
+      }
+     
+      if (result.isOk) {
+        document.getElementById('save-indicator').textContent = 'Saved ✓';
+        setTimeout(() => {
+          document.getElementById('save-indicator').textContent = 'Auto-saving to your Canva Sheet...';
+        }, 2000);
+      }
+    }
+
+    const dataHandler = {
+      onDataChanged(data) {
+        if (data.length > 0) {
+          currentRecord = data[0];
+         
+          gameState.water = currentRecord.water || 0;
+          gameState.water_per_click = currentRecord.water_per_click || 1;
+          gameState.total_clicks = currentRecord.total_clicks || 0;
+          gameState.max_water_ever = currentRecord.max_water_ever || 0;
+
+          try {
+            gameState.click_levels = JSON.parse(currentRecord.click_upgrades || '[]') || [0,0,0,0,0,0,0,0,0,0];
+            gameState.speed_levels = JSON.parse(currentRecord.speed_upgrades || '[]') || [0,0,0,0,0,0,0,0,0,0];
+          } catch {
+            gameState.click_levels = [0,0,0,0,0,0,0,0,0,0];
+            gameState.speed_levels = [0,0,0,0,0,0,0,0,0,0];
+          }
+
+          gameState.total_upgrades = gameState.click_levels.reduce((a,b) => a+b) + gameState.speed_levels.reduce((a,b) => a+b);
+         
+          updateUI();
+        }
+      }
+    };
+
+    async function onConfigChange(config) {
+      const title = config.game_title || defaultConfig.game_title;
+      document.getElementById('game-title').textContent = title;
+    }
+
+    async function init() {
+      if (window.elementSdk) {
+        window.elementSdk.init({
+          defaultConfig,
+          onConfigChange,
+          mapToCapabilities: (config) => ({
+            recolorables: [
+              {
+                get: () => config.background_color || defaultConfig.background_color,
+                set: (value) => { config.background_color = value; window.elementSdk.setConfig({ background_color: value }); }
+              },
+              {
+                get: () => config.surface_color || defaultConfig.surface_color,
+                set: (value) => { config.surface_color = value; window.elementSdk.setConfig({ surface_color: value }); }
+              },
+              {
+                get: () => config.text_color || defaultConfig.text_color,
+                set: (value) => { config.text_color = value; window.elementSdk.setConfig({ text_color: value }); }
+              },
+              {
+                get: () => config.primary_action_color || defaultConfig.primary_action_color,
+                set: (value) => { config.primary_action_color = value; window.elementSdk.setConfig({ primary_action_color: value }); }
+              },
+              {
+                get: () => config.secondary_action_color || defaultConfig.secondary_action_color,
+                set: (value) => { config.secondary_action_color = value; window.elementSdk.setConfig({ secondary_action_color: value }); }
+              }
+            ],
+            borderables: [],
+            fontEditable: undefined,
+            fontSizeable: undefined
+          }),
+          mapToEditPanelValues: (config) => new Map([
+            ['game_title', config.game_title || defaultConfig.game_title]
+          ])
+        });
+      }
+     
+      if (window.dataSdk) {
+        const result = await window.dataSdk.init(dataHandler);
+        if (!result.isOk) console.error('Failed to initialize Data SDK');
+      }
+     
+      updateUI();
+    }
+
+    init();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9d4969e682ab6a07',t:'MTc3MjIxMzQ2NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
